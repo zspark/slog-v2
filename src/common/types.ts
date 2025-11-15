@@ -1,5 +1,6 @@
 export type pid_t = string;
 export type wid_t = string;
+export type tid_t = string;
 
 export type url_t = string;
 export type path_t = string;
@@ -24,7 +25,6 @@ export enum WIDGET_TYPE {
     PAGE_NEW = 'page_new',
     PROPERTY = 'property',
     MARKDOWN = 'markdown',
-    MATH = 'math',
     CUSTOM = 'custom',
     TEMPLATE = 'template',
 }
@@ -53,6 +53,12 @@ export type page_content_t = {
     sections: Record<wid_t, widget_content_t>,
 }
 
+export type page_resource_t = {
+    name: string,
+    dim: Array<number>,
+    sizeInBytes: number,
+}
+
 export type page_property_t = {
     id: pid_t,
     createTime: string,
@@ -61,6 +67,15 @@ export type page_property_t = {
     author: string,
     description: string,
     tags: string,
+    resources: Array<page_resource_t>,
+}
+
+export type template_content_t = {
+    tid: string,
+    name: string,
+    content?: string,
+    layout?: string,
+    action?: string,
 }
 /*
 {

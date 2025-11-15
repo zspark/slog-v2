@@ -19,11 +19,81 @@
 
 * {
     @apply text-gray-700;
+    @apply font-sans;
+}
+/* ::selection {
+   @apply bg-blue-700 text-gray-50;
+} */
+[slg-view]{
+   @apply leading-7;
+}
+[slg-view] img{
+   @apply rounded-lg;
+}
+[slg-view] pre,
+[slg-view] code{
+   @apply rounded text-gray-800 text-sm;
+}
+[slg-view] pre{
+   @apply bg-slate-100;
+}
+[slg-view] pre code{
+   @apply bg-transparent p-0 m-0;
+}
+[slg-view] code{
+   @apply bg-slate-200 px-1;
+}
+[slg-view] p{
+   @apply my-1;
+}
+[slg-view] ul, [slg-view] ol{
+   @apply p-5;
+}
+[slg-view] ul{
+   @apply list-disc;
+}
+[slg-view] ol{
+   @apply list-decimal;
+}
+[slg-view] h1{
+   @apply mt-5 pb-2 mb-3;
+}
+[slg-view] h2{
+   @apply mt-5 pb-2 mb-2;
+}
+[slg-view] h3{
+   @apply mt-5 pb-1 mb-2;
+}
+[slg-view] hr {
+   @apply border-t border-b border-dashed border-gray-200 my-4;
+}
+[slg-view] blockquote {
+   @apply border-l-4 border-gray-500 my-5 px-4 italic;
+}
+[slg-view] a{
+   @apply text-blue-600 hover:underline  rounded;
+}
+[slg-view] table{
+   @apply w-full text-sm text-left text-gray-500 dark:text-gray-400;
+}
+[slg-view] thead{
+   @apply text-xs text-gray-700 uppercase dark:text-gray-400;
+}
+[slg-view] th{
+   @apply px-4 py-2;
+}
+[slg-view] tr{
+   @apply border-b dark:bg-gray-800 dark:border-gray-700;
+}
+[slg-view] td{
+   @apply px-4 py-3;
 }
 
+[slg-dropdown-template] input[type='checkbox'],
 [slg-login] input[type='checkbox']{
     @apply w-4 h-4 text-blue-500 bg-gray-100 border-gray-300 rounded;
 }
+[slg-dropdown-template] input[type='checkbox']+label,
 [slg-login] input[type='checkbox']+label{
    @apply ml-1 text-sm;
 }
@@ -51,25 +121,21 @@
 /*****************************
  widget CSS 
  *****************************/
-
- [slg-editor]{
-    @apply bg-slate-100 rounded relative;
- }
- /* [slg-editor] input,
- section [slg-editor] textarea{
+[slg-view] [slg-title]{
+   @apply font-bold;
+}
+[slg-view] [slg-title][active]{
+   @apply hover:bg-blue-300 cursor-pointer;
+}
+[slg-editor]{
     @apply bg-slate-100 rounded;
-    @apply focus:outline-dashed focus:outline-2;
-    @apply focus:outline-slate-500 focus:outline-offset-0;
- } */
- [slg-editor]:has(> [slg-textarea]:focus){
-    @apply outline-dashed outline-2 outline-slate-500;
  }
 
 [slg-editor] [slg-textarea]{
-    @apply hidden rounded outline-none px-1 pb-1 pt-6;
+    @apply hidden;
 }
 [slg-editor] [slg-textarea][active]{
-   @apply block;
+   @apply block rounded outline-none px-1 py-1;
 }
 
  [slg-editor] [slg-buttons] > button{
@@ -80,20 +146,23 @@
     @apply bg-gray-400
  }
 
-
-
- 
- section [slg-textarea-p]{
-    @apply absolute w-16 text-gray-900 font-bold text-right text-sm slg-css-no-interaction;
- }
- section [slg-textarea-p]+ div{
+[slg-label]{
+    @apply absolute w-12 mx-2 pt-1 text-gray-900 font-bold text-center;
+}
+[slg-label] + div{
+   @apply p-1 pl-16;
     @apply rounded outline-none w-full;
     @apply focus:bg-slate-200;
     @apply empty:before:content-[attr(placeholder)] empty:before:text-gray-400;
- }
- section [slg-editor]:has([slg-focus]:focus){
+}
+[slg-dropdown-template] [slg-label] + div{
+   @apply focus:bg-slate-300;
+}
+
+/*does not support on firefox. chrome is ok*/
+ /* section [slg-editor]:has([slg-focus]:focus){
     @apply outline-dashed outline-2 outline-slate-500;
- }
+ } */
 
 
 
@@ -103,8 +172,8 @@
    @apply flex justify-end pt-0.5;
 }
 section [slg-action] > button{
-   @apply text-gray-500 text-sm;
-   @apply hover:text-gray-600;
+   @apply text-slate-200 text-sm;
+   @apply hover:text-slate-300;
 }
 /* section [slg-action] > img{
   @apply w-4 h-4 stroke-red-300;
@@ -119,16 +188,43 @@ section [slg-action]>button .bi{
 section [slg-action]>button:hover .bi{
    @apply fill-gray-600;
 }
-
-[slg-dropdown-widgets]{
-   @apply fixed top-0 left-0;
-}
 [slg-dropdown-widgets] li a{
    @apply block px-4 py-2 hover:bg-gray-100 cursor-pointer;
 }
-[slg-dropdown-nav]{
-   @apply absolute;
+[slg-dropdown-nav] li{
+   @apply hover:bg-gray-100;
 }
+
 [slg-dropdown-nav] li a{
-   @apply block px-4 py-1 hover:bg-gray-100 cursor-pointer;
+   @apply block px-4 py-1 cursor-pointer;
+}
+
+
+[slg-toggle][active] + div{
+   @apply block;
+}
+
+[slg-dropdown-search-item]{
+   @apply p-1 bg-slate-100 hover:cursor-pointer select-none hover:bg-slate-200 space-y-1;
+}
+[slg-dropdown-search-item]:first-child{
+   @apply rounded-t;
+}
+[slg-dropdown-search-item]:last-child{
+   @apply rounded-b;
+}
+[slg-dropdown-search-item]:not(:last-child){
+   @apply border-b border-slate-300;
+}
+[slg-dropdown-search-item] > p[oneline]{
+   @apply truncate;
+}
+[slg-dropdown-search][active]{
+   @apply block;
+}
+
+
+
+[slg-widget-resource] > [slg-view] img{
+   @apply rounded-none;
 }

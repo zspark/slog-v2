@@ -1,6 +1,7 @@
-import { pid_t, wid_t } from "../common/types"
-import Logger from "../common/logger"
-import DelayPromise from "../common/delay-promise"
+import { pid_t, wid_t } from "../../common/types"
+import Logger from "../../common/logger"
+import DelayPromise from "../../common/delay-promise"
+import { screen_pos_t, screen_size_t } from "../core/types"
 //import { color_t, IColorLikeObject, IColorLikeArray } from "../common/api-ui"
 
 export type InitFunc = (d: Document) => Function;
@@ -138,8 +139,6 @@ export function LoadScriptWithHTMLScriptTag(url: string): DelayPromise<boolean>[
     return _dp.promise;
 }
 
-type screen_pos_t = { x: number, y: number };
-type screen_size_t = { w: number, h: number };
 const _PADDING_SIZE: screen_size_t = { w: 30, h: 30 };
 export function CalcuDropdowPos(target: HTMLElement, refPos: screen_pos_t): screen_pos_t {
     /// append in order to fetch its size;
@@ -188,3 +187,31 @@ export function GetElement(elem: Element | undefined, qString: string): HTMLElem
     if (elem) return elem.querySelector(qString) ?? _e;
     return _e;
 }
+export function GetElementExt<T = HTMLElement>(elem: Element | null | undefined, qString: string): T | null {
+    if (elem) {
+        const _e = elem.querySelector(qString);
+        return _e ? _e as T : null;
+    }
+    return null;
+}
+export function GetElements(elem: Element | undefined, qString: string): Array<Element> {
+    if (elem) return Array.from(elem.querySelectorAll(qString));
+    return [];
+}
+
+export function InsertElementAt(parentElem: Element | undefined, elem: Element | undefined, index: number): void {
+    if (elem && parentElem) {
+        const _count: number = parentElem.childElementCount;
+        index = Math.max(0, Math.min(_count, index));
+        if (_count === index) {
+            parentElem.append(elem);
+        } else if (_count === 0) {
+            parentElem.prepend(elem);
+        } else {
+            let _pivotElem = parentElem.children[index];
+            _pivotElem.before(elem);
+        }
+    }
+}
+
+

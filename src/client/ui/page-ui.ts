@@ -1,4 +1,8 @@
-import { pid_t, wid_t, WIDGET_TYPE, PANE_TYPE, widget_content_t, page_content_t, page_property_t, /*WIDGET_STATE,*/ WIDGET_ACTION } from "../common/types"
+import { pid_t, wid_t, WIDGET_TYPE, PANE_TYPE, widget_content_t, page_content_t, page_property_t, /*WIDGET_STATE,*/ WIDGET_ACTION } from "../../common/types"
+import Logger from "../../common/logger"
+import { EventPhase } from "../core/event-types"
+import Model, { ModelEventMap } from "../model"
+import Controller from "../controller"
 import {
     IMarkdownWidgetHandle,
     IPropertyHandle,
@@ -11,9 +15,7 @@ import {
     CreatePropertyWidget,
 } from "./widget-handler"
 import * as Utils from "./utils"
-import Logger from "../common/logger"
-import { EventPhase } from "./core/event-types"
-import * as DataModel from "./data-model"
+import { IPageUi } from "./ui-type"
 
 const _e = document.createElement('div');
 const _mapWidgetTemplate = new Map<WIDGET_TYPE, Element>();
@@ -22,73 +24,49 @@ function _DoInstantiation(type: WIDGET_TYPE): Element {
     return _tpl.cloneNode(true) as HTMLElement;
 }
 
-function _DestroyHandle(value: Map<pid_t | wid_t, IHandler>, excludes?: Array<pid_t | wid_t>): Record<pid_t | wid_t, IHandler> {
-    let _arr: Record<pid_t | wid_t, IHandler> = {};
-    if (excludes) {
-        excludes.forEach(id => {
-            const _v = value.get(id);
-            if (_v) {
-                _arr[id] = _v;
-                value.delete(id);
-            }
-        });
-    }
-    value.forEach(h => {
-        h.Destroy();
-    });
-    value.clear();
-    return _arr;
-}
-
-export default class PageUi {
+export default class PageUi implements IPageUi {
+    //private _newPageWidget: INewPageHandle;
     private _mapWidgetHandle = new Map<wid_t, IHandler>();
-    private _newPageWidget: INewPageHandle;
+    private _propertyWidget: IPropertyHandle | undefined;
 
     constructor() {
-        this._newPageWidget = CreateNewPageWidget(_mapWidgetTemplate.get(WIDGET_TYPE.PAGE_NEW) ?? _e);
+        CreateNewPageWidget(_mapWidgetTemplate.get(WIDGET_TYPE.PAGE_NEW) ?? _e);
 
-        DataModel.Subscribe('pagelist-fetch-event', (evt) => {
+        Model.Subscribe('pagelist-fetch-event', (evt) => {
             switch (evt.phase) {
                 case EventPhase.BEFORE_RESPOND:
-                    _DestroyHandle(this._mapWidgetHandle);
+                    this._DestroyHandle();
                     break;
                 case EventPhase.RESPOND:
                     {
-                        this._newPageWidget.Show();
                         const _arr = evt.arrPageProperty as Array<page_property_t>;
                         for (let i = 0, N = _arr.length; i < N; ++i) {
                             const _pp: page_property_t = _arr[i];
-                            const _h: IPropertyHandle = CreatePropertyWidget(_pp.id, _DoInstantiation(WIDGET_TYPE.PROPERTY));
+                            const _h: IPropertyHandle = CreatePropertyWidget(_pp.id, _DoInstantiation(WIDGET_TYPE.PROPERTY), true, i);
                             this._mapWidgetHandle.set(_pp.id, _h);
                             _h.SetData(_pp);
                             _h.ShowView();
                             _h.Show();
-                            //_h2.ShowAction(WIDGET_ACTION.TOGGLE);
+                            _h.ShowAction(WIDGET_ACTION.NONE);
                         }
                     }
                     break;
             }
         });
-        DataModel.Subscribe('page-fetch-event', (evt) => {
+        Model.Subscribe('page-fetch-event', (evt) => {
             switch (evt.phase) {
                 case EventPhase.BEFORE_RESPOND:
-                    _DestroyHandle(this._mapWidgetHandle);
+                    this._DestroyHandle();
                     break;
                 case EventPhase.RESPOND:
                     {
+                        let _index: number = 0;
                         const _property = evt.property as page_property_t;
-                        const _h: IPropertyHandle = CreatePropertyWidget(_property.id, _DoInstantiation(WIDGET_TYPE.PROPERTY));
-                        this._mapWidgetHandle.set(_property.id, _h);
-                        _h.ShowAction(
-                            WIDGET_ACTION.NEW |
-                            WIDGET_ACTION.TOGGLE |
-                            WIDGET_ACTION.PREVIEW |
-                            WIDGET_ACTION.SAVE |
-                            WIDGET_ACTION.DELETE
-                        );
-                        _h.SetData(_property);
-                        _h.ShowView();
-                        _h.Show();
+                        this._propertyWidget = CreatePropertyWidget(_property.id, _DoInstantiation(WIDGET_TYPE.PROPERTY), false, _index++);
+                        this._mapWidgetHandle.set(_property.id, this._propertyWidget);
+                        this._propertyWidget.SetData(_property);
+                        this._propertyWidget.ShowView();
+                        this._propertyWidget.Show();
 
 
                         const _content = evt.content as page_content_t;
@@ -98,12 +76,12 @@ export default class PageUi {
                             let _h: IHandler | undefined;
                             switch (_wc.type) {
                                 case WIDGET_TYPE.MARKDOWN:
-                                    _h = CreateMarkdownWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.MARKDOWN));
+                                    _h = CreateMarkdownWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.MARKDOWN), _index++);
                                     (_h as IMarkdownWidgetHandle).SetContent(_wc);
                                     (_h as IMarkdownWidgetHandle).ShowView();
                                     break;
                                 case WIDGET_TYPE.CUSTOM:
-                                    _h = CreateCustomWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.CUSTOM));
+                                    _h = CreateCustomWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.CUSTOM), _index++);
                                     (_h as ICustomWidgetHandle).SetContent(_wc);
                                     (_h as ICustomWidgetHandle).ShowView();
                                     //CodeExecutor(_h.viewElement, _wc.data as widget_content_t);
@@ -115,7 +93,6 @@ export default class PageUi {
                                     //_h = CreatePropertyWidget(_wc.data as widget_content_t);
                                     break;
                                 case WIDGET_TYPE.PAGE_NEW:
-                                case WIDGET_TYPE.MATH:
                                 default:
                                     Logger.Error(`no way to get here, should be internal error somewhere`);
                             }
@@ -131,26 +108,25 @@ export default class PageUi {
             }
         });
 
-        DataModel.Subscribe('page-add-event', (evt) => {
+        Model.Subscribe('page-add-event', (evt) => {
             switch (evt.phase) {
                 case EventPhase.BEFORE_RESPOND:
-                    _DestroyHandle(this._mapWidgetHandle);
+                    this._DestroyHandle();
                     break;
                 case EventPhase.RESPOND:
                     {
                         if (!evt.pageProperty) return;
                         const _pp = evt.pageProperty;
-                        const _h: IPropertyHandle = CreatePropertyWidget(_pp.id, _DoInstantiation(WIDGET_TYPE.PROPERTY));
+                        const _h: IPropertyHandle = CreatePropertyWidget(_pp.id, _DoInstantiation(WIDGET_TYPE.PROPERTY), false, 0);
                         this._mapWidgetHandle.set(_pp.id, _h);
                         _h.ShowEditor();
                         _h.Show();
-                        //_h2.ShowAction(WIDGET_ACTION.TOGGLE);
                     }
                     break;
             }
         });
 
-        DataModel.Subscribe('page-update-event', (evt) => {
+        Model.Subscribe('page-update-event', (evt) => {
             switch (evt.phase) {
                 case EventPhase.RESPOND:
                     {
@@ -163,14 +139,13 @@ export default class PageUi {
                             //let _h2 = _h as IPropertyHandle;
                             //_h2.ShowEditor();
                             //_h2.Show();
-                            //_h2.ShowAction(WIDGET_ACTION.TOGGLE);
                         }
                     }
                     break;
             }
         });
 
-        DataModel.Subscribe('page-delete-event', (evt) => {
+        Model.Subscribe('page-delete-event', (evt) => {
             switch (evt.phase) {
                 case EventPhase.RESPOND:
                     {
@@ -184,7 +159,7 @@ export default class PageUi {
             }
         });
 
-        DataModel.Subscribe('widget-add-event', (evt: DataModel.PageEventMap['widget-add-event']) => {
+        Model.Subscribe('widget-add-event', (evt: ModelEventMap['widget-add-event']) => {
             switch (evt.phase) {
                 case EventPhase.RESPOND:
                     {
@@ -192,13 +167,13 @@ export default class PageUi {
                         const _wc: widget_content_t = evt.data as widget_content_t;
                         switch (_wc.type) {
                             case WIDGET_TYPE.CUSTOM:
-                                _h = CreateCustomWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.CUSTOM));
+                                _h = CreateCustomWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.CUSTOM), evt.index);
                                 (_h as ICustomWidgetHandle).SetContent(_wc);
                                 (_h as ICustomWidgetHandle).ShowEditor();
                                 break;
                             case WIDGET_TYPE.MARKDOWN:
                             default:
-                                _h = CreateMarkdownWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.MARKDOWN));
+                                _h = CreateMarkdownWidget(_wc.id, _DoInstantiation(WIDGET_TYPE.MARKDOWN), evt.index);
                                 (_h as IMarkdownWidgetHandle).SetContent(_wc);
                                 (_h as IMarkdownWidgetHandle).ShowEditor();
                                 break;
@@ -212,7 +187,7 @@ export default class PageUi {
             }
         });
 
-        DataModel.Subscribe('widget-update-event', (evt: DataModel.PageEventMap['widget-update-event']) => {
+        Model.Subscribe('widget-update-event', (evt: ModelEventMap['widget-update-event']) => {
             switch (evt.phase) {
                 case EventPhase.RESPOND:
                     {
@@ -226,7 +201,7 @@ export default class PageUi {
             }
         });
 
-        DataModel.Subscribe('widget-delete-event', (evt: DataModel.PageEventMap['widget-delete-event']) => {
+        Model.Subscribe('widget-delete-event', (evt: ModelEventMap['widget-delete-event']) => {
             switch (evt.phase) {
                 case EventPhase.RESPOND:
                     {
@@ -239,56 +214,64 @@ export default class PageUi {
             }
         });
 
-        /*
-        NavController.Subscribe('nav-clicked-event', (evt) => {
-            switch (evt.phase) {
-                case EventPhase.RESPOND:
-                    {
-                        const _h = this._mapWidgetHandle.get(evt.id);
-                        if (_h) {
-                            this._mapWidgetHandle.delete(evt.id);
-                            _h.Destroy();
-                        }
-                    }
-                    break;
+        Model.Subscribe('upload-finished-event', (evt) => {
+            if (this._propertyWidget) {
+                if (evt.data.code > 0) {
+                    this._propertyWidget.UpdateUploadInfo(evt.data.data);
+                } else {
+                    Logger.Info(`alert to show error message`);
+                }
             }
         });
-        */
     }
 
+    private _DestroyHandle(excludes?: Array<pid_t | wid_t>): void {
+        if (excludes) {
+            excludes.forEach(id => {
+                const _v = this._mapWidgetHandle.get(id);
+                if (_v) {
+                    this._mapWidgetHandle.delete(id);
+                }
+            });
+        }
+        this._mapWidgetHandle.forEach(h => {
+            h.Destroy();
+        });
+        this._mapWidgetHandle.clear();
+        this._propertyWidget = undefined;
+    }
+
+
     static Init(TPL: Element): void {
-        let _value: Element | null;
-        _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-page-new]');
-        if (_value) {
-            _mapWidgetTemplate.set(WIDGET_TYPE.PAGE_NEW, _value);
-        }
+        let _InitFn: Function = () => {
+            let _value: Element | null;
+            _value = Utils.GetElement(TPL, 'div[slg-widget-page-new]');
+            if (_value) {
+                _mapWidgetTemplate.set(WIDGET_TYPE.PAGE_NEW, _value);
+            }
 
-        _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-property]');
-        if (_value) {
-            Utils.RemoveContentIfExist(_value.querySelector('[slg-introduction]'));
-            _mapWidgetTemplate.set(WIDGET_TYPE.PROPERTY, _value);
-        }
+            _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-property]');
+            if (_value) {
+                Utils.RemoveContentIfExist(_value.querySelector('[slg-introduction]'));
+                _mapWidgetTemplate.set(WIDGET_TYPE.PROPERTY, _value);
+            }
 
-        _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-markdown]');
-        if (_value) {
-            Utils.RemoveContentIfExist(_value.querySelector('[slg-view]'));
-            _mapWidgetTemplate.set(WIDGET_TYPE.MARKDOWN, _value);
-        }
+            _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-markdown]');
+            if (_value) {
+                Utils.RemoveContentIfExist(_value.querySelector('[slg-view]'));
+                _mapWidgetTemplate.set(WIDGET_TYPE.MARKDOWN, _value);
+            }
 
-        _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-math]');
-        if (_value) {
-            _mapWidgetTemplate.set(WIDGET_TYPE.MATH, _value);
-        }
+            _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-custom]');
+            if (_value) {
+                _mapWidgetTemplate.set(WIDGET_TYPE.CUSTOM, _value);
+            }
 
-        _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-custom]');
-        if (_value) {
-            _mapWidgetTemplate.set(WIDGET_TYPE.CUSTOM, _value);
+            _InitFn = () => {
+                Logger.Error(`Init function of PageUi should always been invoked once.`);
+            };
         }
-
-        _value = Utils.GetAndRemoveElement(TPL, 'section[slg-widget-template]');
-        if (_value) {
-            _mapWidgetTemplate.set(WIDGET_TYPE.TEMPLATE, _value);
-        }
+        _InitFn();
     }
 }
 

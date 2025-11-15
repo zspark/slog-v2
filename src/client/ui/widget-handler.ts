@@ -1,15 +1,17 @@
-import { pid_t, wid_t, WIDGET_TYPE, PANE_TYPE, widget_content_t, page_content_t, page_property_t, /*WIDGET_STATE,*/ WIDGET_ACTION } from "../common/types"
-import Logger from "../common/logger"
-import { GenID } from "../common/id-generator"
+import { pid_t, wid_t, WIDGET_TYPE, PANE_TYPE, widget_content_t, page_content_t, page_resource_t, page_property_t, /*WIDGET_STATE,*/ WIDGET_ACTION } from "../../common/types"
+import Logger from "../../common/logger"
+import { GenID } from "../../common/id-generator"
+import MarkdownParser from "../core/markdown-parser"
+import CodeExecutor from "../core/custom-widget-executor"
+import Editor from "../core/textarea-with-highlight"
+import Highlighter from "../core/highlighter"
+import Controller from "../controller"
 import * as Utils from "./utils"
-import PageController from "./page-controller"
-import MarkdownParser from "./core/markdown-parser"
-import CodeExecutor from "./core/custom-widget-executor"
-import Editor from "./core/textarea-with-highlight"
 
 
 export interface IHandler {
     readonly uid: string;
+    get index(): number;
     Show(): void;
     Destroy(): void;
 }
@@ -27,6 +29,8 @@ export interface IPropertyHandle extends IHandler {
     ShowView(): void;
     ShowEditor(): void;
     Toggle(): void;
+
+    UpdateUploadInfo(data: { files: Array<any>, fields: Array<any> }): void;
 }
 export interface IWidgetHandle {
     readonly id: wid_t;
@@ -51,7 +55,6 @@ export interface HandlerMap {
     [WIDGET_TYPE.PAGE_NEW]: INewPageHandle,
     [WIDGET_TYPE.PROPERTY]: IPropertyHandle,
     [WIDGET_TYPE.MARKDOWN]: IMarkdownWidgetHandle,
-    [WIDGET_TYPE.MATH]: IMarkdownWidgetHandle,
     [WIDGET_TYPE.CUSTOM]: ICustomWidgetHandle,
     [WIDGET_TYPE.TEMPLATE]: ICustomWidgetHandle,
 }
@@ -109,22 +112,21 @@ function _CreateTags(con: HTMLElement, tpl: HTMLElement, tags: string): void {
     }
 }
 
-
 export function CreateNewPageWidget(elem: Element): INewPageHandle {
     const _viewElem: HTMLElement = Utils.GetElement(elem, '[slg-view]');
     let _tmp = Utils.GetElement(_viewElem, '[slg-new-article]');
     _tmp.onclick = _ => {
         Logger.Info('new article');
-        PageController.TryAddPage();
+        Controller.TryAddPage();
     };
     let _tmp2 = Utils.GetElement(_viewElem, '[slg-quick-note]');
     _tmp2.onclick = _ => { Logger.Info('quick note'); };
 
-
     const _h: INewPageHandle = {
+        index: -1,
         uid: GenID(),
         type: WIDGET_TYPE.PAGE_NEW,
-        Show(): void { _sectionContainer.append(elem); },
+        Show(): void { },
         Destroy(): void {
             elem.remove();
             _tmp.onclick = _tmp2.onclick = null;
@@ -133,28 +135,50 @@ export function CreateNewPageWidget(elem: Element): INewPageHandle {
     return _h;
 }
 
-export function CreatePropertyWidget(pid: pid_t, elem: Element): IPropertyHandle {
+export function CreatePropertyWidget(pid: pid_t, elem: Element, titleCanClick: boolean, index: number = 0): IPropertyHandle {
     const { _viewElem, _editorElem, _actionElem, _actionElemMap, _tagCon, _tagElem } = _GetElem(elem);
     _actionElem.onclick = e => {
         const _aName = (e.target as HTMLElement).dataset['slgActionName'] as string;
         if (_aName) {
-            PageController.HandleMenuClick(_aName, e.clientX, e.clientY, _h);
+            Controller.WidgetActionClicked(e, _h, _aName, { x: e.clientX, y: e.clientY });
         }
-        e.stopPropagation();
     }
-    Utils.GetElement(_viewElem, '[slg-title]').onclick = e => {
-        PageController.PageTitleClick(pid);
+    //const _uploadBtn: HTMLElement = Utils.GetElement(_editorElem, '[slg-upload]');
+    const _resourceContainerElem: HTMLElement = Utils.GetElement(_editorElem, '[slg-resources]');
+    const _placeHolderElem: HTMLElement = Utils.RemoveIfExist(_resourceContainerElem.querySelector('[slg-placeholder]'));
+    const _resourceElem: HTMLElement = Utils.RemoveIfExist(_resourceContainerElem.querySelector('[slg-resource]'));
+    if (titleCanClick) {
+        const _a: HTMLElement = Utils.GetElement(_viewElem, '[slg-title]');
+        _a.setAttribute('active', '');
+        _a.onclick = e => {
+            Controller.PageTitleClick(pid);
+        }
+    } else {
+        const _formElem: HTMLFormElement = Utils.GetElement(_editorElem, '[slg-form]') as HTMLFormElement;
+        //_formElem.addEventListener('submit', e => { });
+        //_formElem.addEventListener("formdata", e => { });
+        const _fiesElem: HTMLInputElement = Utils.GetElement(_formElem, '[slg-files]') as HTMLInputElement;
+        _fiesElem.addEventListener("change", e => {
+            Controller.SubmitResources(_fiesElem);
+        });
     }
 
     const _h: IPropertyHandle = {
+        index,
         uid: GenID(),
         id: pid,
         type: WIDGET_TYPE.PROPERTY,
-        Show(): void { _sectionContainer.append(elem); },
-        Destroy(): void { elem.remove(); },
+        Show(): void {
+            Utils.InsertElementAt(_sectionContainer, elem, index);
+        },
+        Destroy(): void {
+            elem.remove();
+            _actionElem.onclick = null;
+        },
 
         ShowView(): void {
             _editorElem.remove();
+            _h.ShowAction(WIDGET_ACTION.NEW | WIDGET_ACTION.TOGGLE);
             elem.prepend(_viewElem);
         },
         Toggle(): void {
@@ -166,6 +190,10 @@ export function CreatePropertyWidget(pid: pid_t, elem: Element): IPropertyHandle
         },
         ShowEditor(): void {
             _viewElem.remove();
+            _h.ShowAction(
+                WIDGET_ACTION.NEW | WIDGET_ACTION.TOGGLE |
+                WIDGET_ACTION.SAVE | WIDGET_ACTION.DELETE
+            );
             elem.prepend(_editorElem);
         },
         ShowAction: _ShowAction.bind(undefined, _actionElem, _actionElemMap),
@@ -174,6 +202,28 @@ export function CreatePropertyWidget(pid: pid_t, elem: Element): IPropertyHandle
             Utils.GetElement(_editorElem, '[slg-title]').textContent = pp.title;
             Utils.GetElement(_editorElem, '[slg-tags]').textContent = pp.tags;
             Utils.GetElement(_editorElem, '[slg-description]').textContent = pp.description;
+            _resourceContainerElem.replaceChildren();
+            const _N = pp.resources.length;
+            if (_N > 0) {
+                for (let i = 0; i < _N; ++i) {
+                    const _r: page_resource_t = pp.resources[i];
+                    const _tmp: HTMLElement = _resourceElem.cloneNode(true) as HTMLElement;
+                    Utils.GetElement(_tmp, '[slg-title]').textContent = _r.name;
+                    Utils._ELEMENT_FRAGMENT.append(_tmp);
+                }
+                _resourceContainerElem.append(Utils._ELEMENT_FRAGMENT);
+                _resourceContainerElem.onclick = e => {
+                    if ((e.target as HTMLElement).tagName === 'BUTTON') {
+                        const _aName = (e.target as HTMLElement).dataset['slgActionName'] as string;
+                        if (_aName) {
+                            Controller.PageResourceClicked(e, _aName, { x: e.clientX, y: e.clientY });
+                        }
+                    }
+                }
+            } else {
+                _resourceContainerElem.append(_placeHolderElem);
+                _resourceContainerElem.onclick = null;
+            }
 
             _h.Render(pp);
         },
@@ -196,11 +246,43 @@ export function CreatePropertyWidget(pid: pid_t, elem: Element): IPropertyHandle
             Utils.GetElement(_viewElem, '[slg-description]').textContent = pp.description;
             _CreateTags(_tagCon, _tagElem, pp.tags);
         },
+
+        UpdateUploadInfo(data: { files: Array<any> | any, fields: Array<any> }): void {
+            function _CreateLi(file: any): void {
+                const _tmp: HTMLElement = _resourceElem.cloneNode(true) as HTMLElement;
+                Utils.GetElement(_tmp, '[slg-title]').textContent = file.newFilename;
+                Utils._ELEMENT_FRAGMENT.append(_tmp);
+            }
+
+            _resourceContainerElem.replaceChildren();
+            _resourceContainerElem.onclick = null;
+            if (data.files._files instanceof Array) {
+                const _N = data.files._files.length;
+                if (_N > 0) {
+                    for (let i = 0; i < _N; ++i) {
+                        _CreateLi(data.files._files[i]);
+                    }
+                    _resourceContainerElem.onclick = e => {
+                        if ((e.target as HTMLElement).tagName === 'BUTTON') {
+                            const _aName = (e.target as HTMLElement).dataset['slgActionName'] as string;
+                            if (_aName) {
+                                Controller.PageResourceClicked(e, _aName, { x: e.clientX, y: e.clientY });
+                            }
+                        }
+                    }
+                } else {
+                    Utils._ELEMENT_FRAGMENT.append(_placeHolderElem);
+                }
+            } else {
+                _CreateLi(data.files._files);
+            }
+            _resourceContainerElem.append(Utils._ELEMENT_FRAGMENT);
+        },
     };
     return _h;
 }
 
-export function CreateMarkdownWidget(wid: wid_t, elem: Element): IMarkdownWidgetHandle {
+export function CreateMarkdownWidget(wid: wid_t, elem: Element, index: number = Number.MAX_SAFE_INTEGER): IMarkdownWidgetHandle {
     const { _viewElem, _editorElem, _actionElem, _actionElemMap } = _GetElem(elem);
     const _editor: Editor = new Editor();
 
@@ -208,17 +290,19 @@ export function CreateMarkdownWidget(wid: wid_t, elem: Element): IMarkdownWidget
         if ((e.target as HTMLElement).tagName === 'BUTTON') {
             const _aName = (e.target as HTMLElement).dataset['slgActionName'] as string;
             if (_aName) {
-                PageController.HandleMenuClick(_aName, e.clientX, e.clientY, _h);
+                Controller.WidgetActionClicked(e, _h, _aName, { x: e.clientX, y: e.clientY });
             }
-            e.stopPropagation();
         }
     }
 
     const _h: IMarkdownWidgetHandle = {
+        index,
         uid: GenID(),
         id: wid,
         type: WIDGET_TYPE.MARKDOWN,
-        Show(): void { _sectionContainer.append(elem); },
+        Show(): void {
+            Utils.InsertElementAt(_sectionContainer, elem, index);
+        },
         Destroy(): void {
             elem.remove();
             _editor.Destroy();
@@ -227,6 +311,7 @@ export function CreateMarkdownWidget(wid: wid_t, elem: Element): IMarkdownWidget
 
         ShowView(): void {
             _editorElem.remove();
+            _h.ShowAction(WIDGET_ACTION.NEW | WIDGET_ACTION.TOGGLE);
             elem.prepend(_viewElem);
         },
         Toggle(): void {
@@ -239,6 +324,10 @@ export function CreateMarkdownWidget(wid: wid_t, elem: Element): IMarkdownWidget
         ShowEditor(): void {
             _editor.Init(Utils.GetElement(_editorElem, "[slg-textarea]"));
             _viewElem.remove();
+            _h.ShowAction(
+                WIDGET_ACTION.NEW | WIDGET_ACTION.TOGGLE |
+                WIDGET_ACTION.SAVE_TEMPLATE | WIDGET_ACTION.SAVE | WIDGET_ACTION.DELETE
+            );
             elem.prepend(_editorElem);
         },
         ShowAction: _ShowAction.bind(undefined, _actionElem, _actionElemMap),
@@ -260,44 +349,59 @@ export function CreateMarkdownWidget(wid: wid_t, elem: Element): IMarkdownWidget
         },
         Render(wc: Readonly<widget_content_t>): void {
             _viewElem.innerHTML = MarkdownParser.MarkdownStringToHTML(wc.data.content);
+            Highlighter.AutoHighlight(_viewElem);
         }
     };
     return _h;
 }
 
-export function CreateCustomWidget(wid: wid_t, elem: Element): ICustomWidgetHandle {
+export function CreateCustomWidget(wid: wid_t, elem: Element, index: number = Number.MAX_SAFE_INTEGER): ICustomWidgetHandle {
     const { _viewElem, _editorElem, _actionElem, _actionElemMap } = _GetElem(elem);
-    const _editor: Editor = new Editor();
-    _editor.highlightLang = 'json';
-    const _editor2: Editor = new Editor();
-    _editor2.highlightLang = 'html';
-    const _editor3: Editor = new Editor();
-    _editor3.highlightLang = 'javascript';
+    const _buttonsElem: HTMLElement = Utils.GetElement(_editorElem, '[slg-buttons]');
+    const _textareasElem: HTMLElement = Utils.GetElement(_editorElem, '[slg-textareas]');
+    const _editor: Editor = new Editor('json');
+    const _editor2: Editor = new Editor('html');
+    const _editor3: Editor = new Editor('javascript');
+    let _lastShownPaneType: PANE_TYPE = PANE_TYPE.UNKNOWN;
 
     _actionElem.onclick = e => {
         if ((e.target as HTMLElement).tagName === 'BUTTON') {
             const _aName = (e.target as HTMLElement).dataset['slgActionName'] as string;
             if (_aName) {
-                PageController.HandleMenuClick(_aName, e.clientX, e.clientY, _h);
+                Controller.WidgetActionClicked(e, _h, _aName, { x: e.clientX, y: e.clientY });
             }
-            e.stopPropagation();
+        }
+    }
+
+    _buttonsElem.onmousedown = e => {
+        if ((e.target as HTMLElement).tagName === 'BUTTON') {
+            const _pType = (e.target as HTMLElement).dataset['slgButton'] as PANE_TYPE;
+            if (_pType) {
+                _h.ShowPane(_pType);
+            }
         }
     }
 
     const _h: ICustomWidgetHandle = {
+        index,
         uid: GenID(),
         id: wid,
         type: WIDGET_TYPE.CUSTOM,
-        Show(): void { _sectionContainer.append(elem); },
+        Show(): void {
+            Utils.InsertElementAt(_sectionContainer, elem, index);
+        },
         Destroy(): void {
             elem.remove();
             _editor.Destroy();
             _editor2.Destroy();
             _editor3.Destroy();
+            _buttonsElem.onmousedown = null;
+            _actionElem.onclick = null;
         },
 
         ShowView(): void {
             _editorElem.remove();
+            _h.ShowAction(WIDGET_ACTION.NEW | WIDGET_ACTION.TOGGLE);
             elem.prepend(_viewElem);
         },
         Toggle(): void {
@@ -308,10 +412,25 @@ export function CreateCustomWidget(wid: wid_t, elem: Element): ICustomWidgetHand
             }
         },
         ShowEditor(): void {
-            _editor.Init(Utils.GetElement(_editorElem, "[slg-textarea-content]"));
-            _editor2.Init(Utils.GetElement(_editorElem, "[slg-textarea-layout]"));
-            _editor3.Init(Utils.GetElement(_editorElem, "[slg-textarea-action]"));
+            _editor.Init(Utils.GetElement(_textareasElem, "[slg-textarea-content]"));
+            _editor2.Init(Utils.GetElement(_textareasElem, "[slg-textarea-layout]"));
+            _editor3.Init(Utils.GetElement(_textareasElem, "[slg-textarea-action]"));
             _viewElem.remove();
+            _h.ShowAction(
+                WIDGET_ACTION.NEW | WIDGET_ACTION.TOGGLE |
+                WIDGET_ACTION.SAVE_TEMPLATE | WIDGET_ACTION.SAVE | WIDGET_ACTION.DELETE
+            );
+            if (_lastShownPaneType === PANE_TYPE.UNKNOWN) {
+                let _type = PANE_TYPE.UNKNOWN;
+                if (_editor.text) {
+                    _type = PANE_TYPE.CONTENT;
+                } else if (_editor2.text) {
+                    _type = PANE_TYPE.LAYOUT;
+                } else if (_editor3.text) {
+                    _type = PANE_TYPE.ACTION;
+                }
+                _h.ShowPane(_type);
+            }
             elem.prepend(_editorElem);
         },
         ShowAction: _ShowAction.bind(undefined, _actionElem, _actionElemMap),
@@ -332,26 +451,25 @@ export function CreateCustomWidget(wid: wid_t, elem: Element): ICustomWidgetHand
             _editor3.text = wc.data.action;
             CodeExecutor(_viewElem, wc);
         },
-        ShowPane(pType: PANE_TYPE): void {
-            _viewElem.remove();
-            elem.prepend(_editorElem);
-            switch (pType) {
-                case PANE_TYPE.CONTENT:
-                    _editor.highlightLang = 'json';
-                    break;
-                case PANE_TYPE.LAYOUT:
-                    _editor.highlightLang = 'html';
-                    break;
-                case PANE_TYPE.ACTION:
-                    _editor.highlightLang = 'javascript';
-                    break;
-                case PANE_TYPE.UNKNOWN:
-                default:
-                    break;
-            }
+        ShowPane(type: PANE_TYPE): void {
+            if (type === PANE_TYPE.UNKNOWN) return;
+            _lastShownPaneType = type;
+
+            Array.from(_textareasElem.children).forEach(e => {
+                e.removeAttribute("active");
+            });
+            Array.from(_buttonsElem.children).forEach(e => {
+                e.removeAttribute("active");
+            });
+            let _tmp2 = _textareasElem.querySelector(`[slg-textarea-${type}]`);
+            if (_tmp2) _tmp2.setAttribute("active", "");
+            _tmp2 = _buttonsElem.querySelector(`[slg-button-${type}]`);
+            if (_tmp2) _tmp2.setAttribute("active", "");
         },
+
         Render(wc: Readonly<widget_content_t>): void {
             CodeExecutor(_viewElem, wc);
+            Highlighter.AutoHighlight(_viewElem);
         }
     };
     return _h;

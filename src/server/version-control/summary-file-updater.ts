@@ -1,4 +1,4 @@
-import { page_property_t, pid_t } from "../../common/types"
+import { page_property_t, pid_t, page_resource_t } from "../../common/types"
 import Logger from "../../common/logger"
 import { version_t, GetVersionString, MakeVersion } from "./version"
 
@@ -16,6 +16,7 @@ type summary_file_v0_5_t = {
         modifyTime: string,
         description: string,
         tags: string,
+        resources: Array<{ name: string, dim: Array<number>, sizeInBytes: number }>,
     }>
 }
 
@@ -36,7 +37,17 @@ _Parsers[GetVersionString(MakeVersion(0, 5, 0, 0), 2)] = (input: summary_file_v0
             author: '',
             description: _tmp.description,
             tags: _tmp.tags,
+            resources: [],
         };
+        const _N = _tmp.resources?.length ?? 0;
+        for (let i = 0; i < _N; ++i) {
+            const _r: page_resource_t = {
+                name: _tmp.resources[i].name,
+                dim: [..._tmp.resources[i].dim],
+                sizeInBytes: _tmp.resources[i].sizeInBytes,
+            };
+            _u.resources.push(_r);
+        }
         out.push(_u);
     }
 }
@@ -65,14 +76,25 @@ export function Update(input: Array<page_property_t>): string {
         pages: [],
     }
     for (let i = 0, N = input.length; i < N; ++i) {
-        _tmp.pages.push({
-            id: input[i].id,
-            title: input[i].title,
-            createTime: input[i].createTime,
-            modifyTime: input[i].modifyTime,
-            description: input[i].description,
-            tags: input[i].tags,
-        });
+        const _r: page_property_t = input[i];
+        const _p: any = {
+            id: _r.id,
+            title: _r.title,
+            createTime: _r.createTime,
+            modifyTime: _r.modifyTime,
+            description: _r.description,
+            tags: _r.tags,
+            resources: [],
+        };
+        for (let j = 0, N = _r.resources.length; j < N; ++j) {
+            const _tmp: any = {
+                name: _r.resources[j].name,
+                dim: [..._r.resources[j].dim],
+                sizeInBytes: _r.resources[j].sizeInBytes,
+            };
+            _p.resources.push(_tmp);
+        }
+        _tmp.pages.push(_p);
     }
     return JSON.stringify(_tmp);
 }

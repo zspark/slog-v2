@@ -1,8 +1,12 @@
-import PageController from "./page-controller"
-import * as WidgetUi from "./widget-handler"
-import PageUi from "./page-ui"
-import MenuUi from "./menu-ui"
-import NavUi from "./nav-ui"
+import Controller from "./controller"
+import * as WidgetUi from "./ui/widget-handler"
+import CommonUi from "./ui/common-ui"
+import PageUi from "./ui/page-ui"
+import MenuUi from "./ui/menu-ui"
+import NavUi from "./ui/nav-ui"
+import TemplateUi from "./ui/template-ui"
+import SearchUi from "./ui/search-ui"
+import MainUiInit from "./ui/main-ui"
 //import Messager from "./core/messager.js"
 //import Sidebar from "./sidebar/sidebar.js"
 //import Page from "./page/page.js"
@@ -11,6 +15,10 @@ import NavUi from "./nav-ui"
 //import Search from "./search/search.js"
 //import Asset from "./asset/asset.js"
 
+export type ApplicationCreateOption = {
+    arrCmd: Array<string>,
+    editorMode: boolean,
+}
 export default class Application {
     //#sidebar = undefined;
     //#page = undefined;
@@ -19,12 +27,20 @@ export default class Application {
     //#asset = undefined;
     //#footer = undefined;
 
-    constructor(TPL: HTMLElement) {
+    constructor(TPL: HTMLElement, option?: ApplicationCreateOption) {
+        CommonUi.Init(TPL);
+        MainUiInit(TPL);
         NavUi.Init(TPL);
         MenuUi.Init(TPL);
         PageUi.Init(TPL);
+        TemplateUi.Init(TPL);
         WidgetUi.Init(TPL);
+        SearchUi.Init(TPL);
+        //new TemplateUi();
+        new MenuUi();
+        new NavUi();
         new PageUi();
+        new SearchUi();
 
 
         /*
@@ -50,7 +66,8 @@ export default class Application {
         })
         */
 
-        PageController.TryFetchPageList();
+
+        Controller.TryFetchPageList();
     }
 }
 

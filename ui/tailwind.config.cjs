@@ -12,6 +12,7 @@ module.exports = {
         bottom: "bottom",
         width: "width",
         right: "right",
+        maxHeight: "max-height",
       },
     },
     screens: {

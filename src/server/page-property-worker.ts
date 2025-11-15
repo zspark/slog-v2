@@ -50,7 +50,7 @@ function CreateReadWriteWorker(): IPropertyWorker {
     };
 }
 
-export function GetPagePropertyWorker(userType: USER_TYPE): IPropertyWorker {
+export function GetPagePropertyWorker(userType: USER_TYPE,): IPropertyWorker {
     Logger.Debug('GetPagePropertyWorker', userType);
     switch (userType) {
         case USER_TYPE.UNKNOWN:

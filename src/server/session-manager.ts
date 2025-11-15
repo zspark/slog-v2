@@ -1,19 +1,25 @@
 import { pid_t } from "../common/types"
 import Logger from "../common/logger"
-import {GenID} from "../common/id-generator"
+import { GenID } from "../common/id-generator"
 import { User, GetVisitor } from "./user-manager"
 import * as PropertyWorker from "./page-property-worker"
 import * as ContentWorker from "./page-content-worker"
+import * as UploadWorker from "./resource-upload-worker"
 
 export type sid_t = string;
 
 export class Session {
     readonly sid: sid_t;
     private _user: User;
+    private _pid: pid_t | undefined;
 
     constructor(id: sid_t, user: User) {
         this.sid = id;
         this._user = user;
+    }
+
+    GetHandleOfUpload(): UploadWorker.IResourceUploadWorker {
+        return UploadWorker.GetUploadWorker(this._user.type, this._pid);
     }
 
     GetHandleOfContent(pid: pid_t): ContentWorker.IContentWorker {
@@ -23,6 +29,13 @@ export class Session {
     GetHandleOfProperty(): PropertyWorker.IPropertyWorker {
         //Logger.Debug(`pid:`, pid, " ", this._propertyManipulator);
         return PropertyWorker.GetPagePropertyWorker(this._user.type);
+    }
+
+    set pid(value: pid_t | undefined) {
+        this._pid = value;
+    }
+    get pid(): pid_t | undefined {
+        return this._pid;
     }
 }
 
@@ -42,39 +55,32 @@ function CreateSessionInfo(s: Session, user: User): SessionInfo {
 }
 
 
-export class SessionManager {
-    private _mapSession = new Map<sid_t, SessionInfo>();
-    private _visitorSession: Session;
-    private _timerId: number;
+const _mapSession = new Map<sid_t, SessionInfo>();
+const _visitorSession = new Session('visitor-session-id', GetVisitor());
 
-    constructor() {
-        this._visitorSession = new Session('visitor-session-id', GetVisitor());
-        this._timerId = setInterval(_ => {
-            this._mapSession.forEach(sInfo => {
-            });
-            this._mapSession.clear();
-        }, 24 * 60 * 60 * 1000);
+setInterval(_ => {
+    _mapSession.forEach(sInfo => { });
+    _mapSession.clear();
+}, 24 * 60 * 60 * 1000);
+
+export function GetSession(sid: sid_t | undefined): Session | undefined {
+    if (sid) {
+        return _mapSession.get(sid)?.session;
     }
+}
 
-    GetSession(sid: sid_t | undefined): Session | undefined {
-        if (sid) {
-            return this._mapSession.get(sid)?.session;
-        }
+export function GetVisitorSession(): Session { return _visitorSession; }
+
+export function DeleteSession(sid: sid_t): void {
+    const _sInfo: SessionInfo | undefined = _mapSession.get(sid);
+    if (_sInfo) {
+        _mapSession.delete(sid);
     }
+}
 
-    GetVisitorSession(): Session { return this._visitorSession; }
-
-    DeleteSession(sid: sid_t): void {
-        const _sInfo: SessionInfo | undefined = this._mapSession.get(sid);
-        if (_sInfo) {
-            this._mapSession.delete(sid);
-        }
-    }
-
-    CreateSession(user: User): Session {
-        const _s: Session = new Session(GenID(), user);
-        this._mapSession.set(_s.sid, CreateSessionInfo(_s, user));
-        return _s;
-    }
+export function CreateSession(user: User): Session {
+    const _s: Session = new Session(GenID(), user);
+    _mapSession.set(_s.sid, CreateSessionInfo(_s, user));
+    return _s;
 }
 

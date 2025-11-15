@@ -1,4 +1,5 @@
-import DynamicImport from "./dynamic-import";
+/*
+import DynamicImport from "../../common/dynamic-import";
 
 type load_t = (v: string) => Promise<any>;
 type hgFunc_t = (content: string, language: string) => string;
@@ -42,3 +43,40 @@ let Highlight: hgFunc_t = (content, _) => {
 };
 
 export default { LoadLanguage, Highlight };
+*/
+
+
+
+import hljs from 'highlight.js';
+//import DynamicImport from "../../common/dynamic-import";
+
+/*
+const _mapPromise: Map<string, Promise<any>> = new Map();
+const _mapLangLoaded: Map<string, boolean> = new Map();
+
+function _LoadLanguage(language: string): Promise<any> {
+    console.info(`[SLOG] load language highlight file: ${language}`);
+    let _p = DynamicImport(`../../highlight.js/languages/${language}.min.js`).then(
+        (m) => {
+            hljs.registerLanguage(language, m.default);
+            _mapLangLoaded.set(language, true);
+        },
+        (err) => {
+            //ToastMessager.Show(`error loading language parser:\n${err}`, MessagerLevel.ERROR);
+        }
+    );
+    _mapPromise.set(language, _p);
+}
+*/
+
+function Highlight(content: string, language: string): string {
+    return hljs.highlight(content, { language }).value;
+}
+
+function AutoHighlight(elem: Element) {
+    elem.querySelectorAll('pre code').forEach(el => {
+        hljs.highlightElement(el as HTMLElement);
+    });
+}
+
+export default { Highlight, AutoHighlight };

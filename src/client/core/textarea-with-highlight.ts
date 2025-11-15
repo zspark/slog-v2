@@ -1,7 +1,12 @@
-import { basicSetup } from "codemirror"
-import { EditorView } from "@codemirror/view"
+//import { minimalSetup } from "codemirror"
+//import { vim } from "@replit/codemirror-vim"
+import { EditorView, /*lineNumbers,*/ highlightActiveLine, keymap } from "@codemirror/view"
 import { EditorState, Compartment } from "@codemirror/state"
-import { vim } from "@replit/codemirror-vim"
+import { autocompletion, completionKeymap } from "@codemirror/autocomplete"
+import { bracketMatching, defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language"
+import { history, defaultKeymap, historyKeymap, /*indentWithTab,*/ insertTab, indentLess } from '@codemirror/commands';
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
+import { lintKeymap } from '@codemirror/lint';
 import { markdown as lang_markdown } from "@codemirror/lang-markdown"
 import { javascript as lang_javascript } from "@codemirror/lang-javascript"
 import { json as lang_json } from "@codemirror/lang-json"
@@ -14,6 +19,32 @@ const _langMap: Record<string, Function> = {
     'html': lang_html,
 }
 
+const myTheme = EditorView.theme({
+    "&": {
+        width: "100%",
+        //fontSize: "smaller",
+        //font: "'JetBrains Mono', monospace",
+        //fontFamily: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"'
+        //fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+    },
+    "&.cm-focused": {
+        outline: "2px solid transparent",
+        outlineOffset: "2px"
+    },
+    "&.cm-focused .cm-selectionBackground": {
+        backgroundColor: "rgb(226 232 240)"
+    },
+    ".cm-gutters": {
+        backgroundColor: "rgb(241 245 249)",
+        color: "#ddd",
+        //border: "none"
+    },
+    ".cm-line": {
+        lineHeight: '1.5rem'/* 20px */,
+    },
+
+}, { dark: false })
+
 /**
  * <h1>doc to test </h1>
  */
@@ -24,7 +55,8 @@ export default class TextareaWithHighlight {
     #_state: EditorState | undefined;
     #_language: Compartment;
 
-    constructor() {
+    constructor(highlightLang: string = 'markdown') {
+        this.#_lang = highlightLang;
         this.#_language = new Compartment();
     }
 
@@ -34,8 +66,40 @@ export default class TextareaWithHighlight {
         const _langFunc: Function = (this.#_lang ? _langMap[this.#_lang] : lang_markdown) ?? lang_markdown;
         this.#_state = EditorState.create({
             extensions: [
-                vim(),
-                basicSetup,
+                EditorView.lineWrapping,
+                //lineNumbers(),
+                autocompletion(),
+                bracketMatching(),
+                highlightActiveLine(),
+                highlightSelectionMatches(),
+                history(),
+                syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+                //codeFolding(),
+                //vim(),
+                //basicSetup,
+                //minimalSetup,
+                keymap.of([
+                    ...defaultKeymap,
+                    ...searchKeymap,
+                    ...historyKeymap,
+                    ...lintKeymap,
+                    ...completionKeymap,
+                    {
+                        key: 'Tab',
+                        preventDefault: true,
+                        run: insertTab,
+                    },
+                    /*
+                        *J: would NOT work for me.
+                    {
+                        key: 'Shift-Tab',
+                        preventDefault: true,
+                        run: indentLess,
+                    },
+                    */
+                ]),
+                myTheme,
+                EditorState.tabSize.of(2),
                 this.#_language.of(_langFunc()),
             ],
             doc: this.#_text,

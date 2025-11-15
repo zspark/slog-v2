@@ -69,6 +69,7 @@ function CreateProperty(): page_property_t | undefined {
         title: new Date().toString(),
         author: '',
         tags: '',
+        resources: [],
     }
     _pageCollection.Insert(_pp, -1);
     return _pp;

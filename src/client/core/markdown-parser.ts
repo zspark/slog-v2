@@ -1,4 +1,6 @@
 import { marked } from 'marked';
+import markedKatex from "marked-katex-extension-ts";
+
 /*
 import { Parser } from "../../3rd/marked/Parser.js";
 import { Renderer } from "../../3rd/marked/Renderer.js";
@@ -7,13 +9,18 @@ import { Lexer } from "../../3rd/marked/Lexer.js";
 */
 //import Highlighter from './highlighter.js'
 
+
+const options = {
+    throwOnError: false
+};
+marked.use(markedKatex(options));
+
 const _r = new marked.Renderer();
 const _t = new marked.Tokenizer();
-const _options = {
+const _options: marked.MarkedOptions = {
     tokenizer: _t,
     renderer: _r,
     gfm: true,
-    tables: true,
     breaks: false,
     pedantic: false,
     sanitize: false,
@@ -21,9 +28,12 @@ const _options = {
     smartypants: false,
     langPrefix: 'hljs language-', // highlight.js css expects a top-level 'hljs' class.
     headerIds: true,
-    headerPrefix: ""
+    headerPrefix: "",
+
 };
-const _parser = new marked.Parser(_options);
+//const _parser = new marked.Parser(_options);
+
+
 
 /*
 async function MarkdownStringToHTML2(content) {
@@ -52,9 +62,9 @@ async function MarkdownStringToHTML2(content) {
 */
 
 function MarkdownStringToHTML(content: string): string {
-    //return marked.parse(content);
-    const _tokens = marked.Lexer.lex(content);
-    return `<div>${_parser.parse(_tokens)}</div>`;
+    return marked.parse(content, _options);
+    //const _tokens = marked.Lexer.lex(content);
+    //return `<div>${_parser.parse(_tokens)}</div>`;
 }
 
 export default { MarkdownStringToHTML }

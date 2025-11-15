@@ -1,12 +1,18 @@
+require('dotenv').config()
+///console.log(process.env) // remove this after you've confirmed it is working
+const { BUILD, MINIFY } = process.env;
+
 const Path = require('path')
 const FS = require('fs');
-//const Rollup = require('rollup');
 //const CleanCSS = require("clean-css");
-//const UglifyJS = require("uglify-js");
 const JSDOM = require('jsdom');
 
 const nodeResolve = require("@rollup/plugin-node-resolve");
+const commonjs = require('@rollup/plugin-commonjs');
+const terser = require('@rollup/plugin-terser');
+const cleanup = require('rollup-plugin-cleanup');
 const Rollup = require('rollup');
+
 
 function _Rename(path, oldName, newName) {
     FS.rename(Path.resolve(path, oldName), Path.resolve(path, newName), function(err) {
@@ -45,6 +51,7 @@ async function RollupBundleServer() {
     // create a bundle
     const bundle = await Rollup.rollup({
         input: [`.build/server/server.js`],
+        //plugins: [cleanup()],
     });
     //console.log("server depends on :\n", bundle.watchFiles); // an array of file names this bundle depends on
 
@@ -63,13 +70,21 @@ async function RollupBundleServer() {
 }
 
 async function RollupBundleClient() {
+    let plugs = [nodeResolve(), commonjs()];
+    if (BUILD === 'product') {
+    }
+    if (MINIFY === 'yes') {
+        plugs.push(cleanup());
+        plugs.push(terser({ maxWorkers: 4 }));
+    }
     //console.info(new Date().toString(), 'Bundling...');
 
     // create a bundle
     const bundle = await Rollup.rollup({
         input: [`.build/client/main.js`, `.build/client/init.js`],
         treeshake: true,
-        plugins: [nodeResolve()],
+        plugins: plugs,
+        ///external: ['katex'],
     });
     //console.log("client depends on :\n", bundle.watchFiles); // an array of file names this bundle depends on
 
