@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+    <meta name="description" content="This is a developing blog site." />
+    <meta name="author" content="Jerry Chaos" />
+    <meta name="applicable-device" content="pc,pad,mobile" />
+    <meta name="keywords" content="slog,blog,computer,program" />
+    <meta name="referrer" content="always" />
+    <title>Jerry Chaos</title>
+    <link href="./img/favicon.ico" rel="shortcut icon">
+    <link href="./lib/slog/css/style.css" rel="stylesheet" type="text/css" />
+    <link href="./lib/highlight.js/css/default.min.css" rel="stylesheet" type="text/css" />
+    <link href="./lib/katex/katex.min.css" rel="stylesheet" type="text/css" />
+    <script type='module' src="./lib/slog/js/init.bundle.js"></script>
+    <script src="./lib/slog/js/ui.js"></script>
+</head>
+
+<body>
+    <div before-loaded class="w-screen h-screen grid grid-cols-[1fr_auto_1fr] grid-rows-[1fr_auto_auto_auto_1fr]">
+        <label class="col-start-2 row-start-2 text-[16rem] text-slate-300 select-none">SLOG</label>
+
+        <div slg-loading class="row-start-4 col-start-2 flex justify-center items-center">
+            <div class="inline-flex">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                    class="animate-spin -ml-1 mr-3 h-5 w-5 text-white">
+                    <circle style="opacity: 0.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                    </circle>
+                    <path style="opacity: 0.75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
+                Loading ...
+            </div>
+        </div>
+    </div>
+
+
+
+</body>
+<!-- <script>
+    const _con = document.querySelector('[before-loaded]')
+    const _login = document.querySelector('[slg-login]');
+    const _loading = document.querySelector('[slg-loading]');
+    _login.remove();
+    _loading.remove();
+    const _buttonSVG = _login.querySelector('[slg-login-button] svg');
+    _buttonSVG.remove();
+    
+</script> -->
+
+</html>

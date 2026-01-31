@@ -11,6 +11,3 @@ backup/
 *.un~
 *.*~
 
-package-lock.json
-
-/deployment/

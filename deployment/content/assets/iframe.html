@@ -1,0 +1,32 @@
+<html>
+
+<body onload=test()>
+    <h1>Hello World</h1>
+</body>
+<script>
+
+    function test() {
+        var iframe = document.createElement('iframe');
+        iframe.style.borderStyle = "none";
+        //iframe.style.outlineStyle="none";
+        iframe.style.padding = "10px";
+        iframe.id = 'testframe';
+        iframe.width = 1000;
+        iframe.height = 600;
+        iframe.name = 'testframe';
+        //iframe.src = 'https://interactive-examples.mdn.mozilla.net/pages/js/array-concat.html';
+        var fn = function () {
+            console.log(this);
+            this.contentDocument.body.innerHTML = `<h1>Hello World</h1>`;
+            /*alert('iframe loaded ok');*/
+        };
+        if (iframe.attachEvent) {
+            iframe.attachEvent('onload', fn);
+        } else {
+            iframe.onload = fn;
+        }
+        document.body.append(iframe);
+    }
+</script>
+
+</html>

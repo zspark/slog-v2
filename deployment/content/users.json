@@ -1,0 +1,12 @@
+{
+	"version":{"major":0,"minor":5,"patch":0,"build":0},
+	"users":[
+		{
+			"account": "jerry-chaos@outlook.com",
+			"password": "c4ca4238a0b923820dcc509a6f75849b",
+			"displayName": "Jerry Chaos",
+			"type":9999,
+			"privilege":15
+		}
+	]
+}
